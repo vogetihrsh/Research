@@ -1,0 +1,31 @@
+In file included from main.cpp:12:
+setvariables.hpp:15: error: redefinition of ‘int MEAN’
+classify.hpp:15: error: ‘int MEAN’ previously declared here
+setvariables.hpp:16: error: redefinition of ‘unsigned int CUTOFF’
+readFile.hpp:23: error: ‘unsigned int CUTOFF’ previously declared here
+setvariables.hpp:20: error: redefinition of ‘double AVG’
+compareRegions.hpp:14: error: ‘double AVG’ previously declared here
+setvariables.hpp:21: error: redefinition of ‘double LOWTHRES’
+compareRegions.hpp:13: error: ‘double LOWTHRES’ previously declared here
+setvariables.hpp:22: error: redefinition of ‘double UPPTHRES’
+compareRegions.hpp:13: error: ‘double UPPTHRES’ previously declared here
+main.cpp:17: error: redefinition of ‘double SD’
+setvariables.hpp:23: error: ‘double SD’ previously declared here
+main.cpp:18: error: redefinition of ‘int MEAN’
+classify.hpp:15: error: ‘int MEAN’ previously declared here
+main.cpp:19: error: redefinition of ‘unsigned int CUTOFF’
+readFile.hpp:23: error: ‘unsigned int CUTOFF’ previously declared here
+main.cpp:20: error: redefinition of ‘unsigned int OUTLIER_CUTOFF’
+setvariables.hpp:17: error: ‘unsigned int OUTLIER_CUTOFF’ previously declared here
+main.cpp:22: error: redefinition of ‘unsigned int MIN_COUNT’
+setvariables.hpp:19: error: ‘unsigned int MIN_COUNT’ previously declared here
+main.cpp:23: error: redefinition of ‘double AVG’
+compareRegions.hpp:14: error: ‘double AVG’ previously declared here
+main.cpp:24: error: redefinition of ‘double LOWTHRES’
+compareRegions.hpp:13: error: ‘double LOWTHRES’ previously declared here
+main.cpp:25: error: redefinition of ‘double UPPTHRES’
+compareRegions.hpp:13: error: ‘double UPPTHRES’ previously declared here
+main.cpp:26: error: redefinition of ‘unsigned int READ_LENGTH’
+setvariables.hpp:18: error: ‘unsigned int READ_LENGTH’ previously declared here
+main.cpp:28: error: redefinition of ‘std::string OUTPUT_PREFIX’
+setvariables.hpp:25: error: ‘std::string OUTPUT_PREFIX’ previously declared here

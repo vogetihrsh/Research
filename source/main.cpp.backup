@@ -1,0 +1,63 @@
+#include<iostream>
+#include<vector>
+#include<string>
+#include<algorithm>
+#include<cmath>
+#include "readFile.hpp"
+#include "structure.hpp"
+#include "classify.hpp"
+#include<cstdio>
+#include "compareRegions.hpp"
+
+using namespace std;
+
+	unsigned int SD=10;
+	int MEAN=300;
+	unsigned int CUTOFF= 3*SD;
+	unsigned int OUTLIER_CUTOFF=1000000;
+	int DISTCUTOFF=(int) MEAN/4;
+	unsigned int MIN_COUNT=5;
+	double AVG=100;
+	double LOWTHRES=0.55*AVG;
+	double UPPTHRES=1.45*AVG;
+	unsigned int READ_LENGTH=100;
+
+// comparison function for sorting the array 
+bool myfunc(ReadPair a, ReadPair b)
+{
+	return ((a.P<b.P || (a.P==b.P&&a.MP<<b.MP)));
+}
+
+int main(int argc, char *argv[])
+{
+	if(argc<3){
+		cerr<<"Error: Insufficient Number of arguments"<<endl;
+		return 0;
+	}
+
+	int FLAG=atoi(argv[2]);
+	if(FLAG<1 || FLAG>3){
+		cerr<<"Wrong Flag Value\nFlag Value lies between [1,3]"<<endl;
+		return 0;
+	}
+	vector<ReadPair> ret;		// vector after reading the file 
+	vector<DisRegion> Candidate_SV;	// vector containing candidate SV regions 
+	ret=readFile(argv[1],FLAG);
+	sort(ret.begin(),ret.end(),myfunc);
+		
+	switch(FLAG){
+	case 1: Candidate_SV=DeletionInsertion(ret); 
+		break;
+	case 2: Candidate_SV=Inversion(ret);
+		break;
+	case 3: Candidate_SV=TandemTransversion(ret);
+		break;
+	default: ;
+	}
+
+	cerr<<"Candidate Regions:"<<Candidate_SV.size()<<endl;
+	cerr<<UPPTHRES<<" "<<LOWTHRES<<endl;	
+	MatchRegions(Candidate_SV,argv[3],FLAG);
+	return 0;
+}
+
