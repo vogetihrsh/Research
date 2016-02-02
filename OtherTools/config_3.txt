@@ -1,0 +1,45 @@
+[general]
+
+chrLenFile = chr4.len
+window = 100
+step = 400
+ploidy = 2
+intercept=1
+minMappabilityPerWindow = 0.7
+outputDir = 21_sorted_100
+
+sex=XY
+breakPointType=4
+chrFiles = /home1/ngs/hg18/
+
+[sample]
+
+
+mateFile =/home1/ngs/harsha/chrom4_simulations/Single_ended_Bamfiles/21_sorted.bam
+inputFormat = BAM
+matesOrientation=0
+
+[control]
+
+[BAF]
+SNPfile = /home1/ngs/CF/hg18_snp130.SNP.1based.txt
+minimalCoveragePerPosition = 5
+
+
+#if you don't have binary version of Control-FREEC, you need to compile it. Go the directory with Control-FREEC source files and type
+
+make
+
+#go to the directory with the data and the config file.
+
+#run Control-FREEC:
+
+PATH_TO_FREEC/freec -conf config_chr19.txt
+*** you can find freeC executable file in PROJECT/Project/ControlFreeC folder 
+
+#If you have problems than you probably need to modify the paths to input files in the config file. 
+#You can read about how to create your own config at http://bioinfo-out.curie.fr/projects/freec/tutorial.html#CONFIG
+
+#to visualize the output (R should be installed):
+
+cat makeGraph_Chromosome.R | R --slave --args 19 2 PATH_TO_THE_OUTPUT/chr_19.noDup0.pileup.gz_ratio.txt PATH_TO_THE_OUTPUT/chr_19.noDup0.pileup.gz_BAF.txt 
