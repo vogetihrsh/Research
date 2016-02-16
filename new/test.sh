@@ -24,17 +24,17 @@ done
 
 
 # DATA PREPARATION AND FILTERING 
-samtools view -@ 4 -q 1 -bh $input_file > temp1.bam;
-/usr/bin/bedtools-2.17.0/bin/bedtools bamtobed -i temp1.bam > $output"_reads.bed";
-/usr/bin/bedtools-2.17.0/bin/bedtools coverage -a $output"_reads.bed" -b $window_file > temp1.bed;
+samtools view -@ 4 -q 1 -bh $input_file > $output"_temp1.bam";
+/usr/bin/bedtools-2.17.0/bin/bedtools bamtobed -i $output"_temp1.bam" > $output"_reads.bed";
+/usr/bin/bedtools-2.17.0/bin/bedtools coverage -a $output"_reads.bed" -b $window_file > $output"_temp1.bed";
 rm -rf $output"_reads.bed";
 
-sort -n -k2 temp1.bed -o temp1.bed;
-paste temp1.bed $mappability_file > temp2;
-mv temp2 temp1.bed;
-awk '{if($4!=0&&$5!=0&&$8>=0.5)print $4;}' temp1.bed > $output"_cnvtv.input";
-awk '{if($4!=0&&$5!=0&&$8>=0.5)print $2,$3;}' temp1.bed > $output"_cnvtv.bincor"; 
-rm -rf temp1.bed temp1.bam;
+sort -n -k2 $output"_temp1.bed" -o $output"_temp1.bed";
+paste $output"_temp1.bed" $mappability_file > $output"_temp2";
+mv $output"_temp2" $output"_temp1.bed";
+awk '{if($4!=0&&$5!=0&&$8>=0.5)print $4;}' $output"_temp1.bed" > $output"_cnvtv.input";
+awk '{if($4!=0&&$5!=0&&$8>=0.5)print $2,$3;}' $output"_temp1.bed" > $output"_cnvtv.bincor"; 
+rm -rf $output"_temp1.bed" $output"_temp1.bam";
 
 
 # DIVIDE INTO CHUNKS 
@@ -81,11 +81,23 @@ lower_cutoff=$(echo $ll $avg1 | awk '{print $1*$2}' )
 upper_cutoff=$(echo $uu $avg1 | awk '{print $1*$2}' )
 awk -v lc="$lower_cutoff" -v hc="$upper_cutoff" -v outfile="$output$bedcnv" -v avg="$avg1" '
 
+
+
+
 function isCopyNumberZero(cAvg,cCount)
 {
 	average = cAvg/cCount;
 	average = (average*2)/avg;
 	return int(average + 0.5);
+}
+
+function shouldMerge(prevStart, prevEnd, curStart, curEnd)
+{
+	Ratio=(curStart-prevEnd-1)/(curEnd-prevStart+1);
+	if(Ratio<0.2)
+		return 1;
+	else 
+		return 0;
 }
 
 
@@ -99,6 +111,7 @@ BEGIN {
 	prevRD=-1;
 	diff=0;
 	prevEndPoint=-1;
+	prevStart=-1;
 }
 
 {
@@ -106,7 +119,7 @@ BEGIN {
 		diff=prevRD-$3;
 	else
 		diff=$3-prevRD;
-	if(entryPointer==1 && (($3<=lc || $3>=hc) && ($1-prevEndPoint<=500|| isCopyNumberZero(curAvg,count)==0))&& (diff<avg/2))
+	if(entryPointer==1 && (($3<=lc||$3>=hc||shouldMerge(prevStart,prevEndPoint,$1,$2)==1)&&(diff<avg/4)))
 	{
 		curAvg=curAvg+$3;
 		count=count+1;
@@ -138,6 +151,7 @@ BEGIN {
 		curAvg = curAvg + $3;
 	}
 	prevEndPoint = $2;
+	prevStart=$1;
 	prevRD=$3;
 }' $output"_cnvtv.call";
 rm -rf $output"_cnvtv.call";
