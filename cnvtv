@@ -8,10 +8,8 @@ Calc_and_Print(){
 		echo "arr=as.integer(c(${arr[@]})); AVG=as.integer($avg); 
 		c=unlist(lapply(arr,function(x) ifelse(x<AVG,ppois(x,lambda=AVG),ppois(x,lambda=AVG,lower=FALSE) ) ));  
 	d=unlist(lapply(arr,function(x) dpois(x,lambda=AVG)));
-	for (i in 1:le) cat(c[i],d[i],'\n')" |R --slave -q | paste $i"_cnvtv_temp.cnv" - | awk -v nWin="$nWin" -v OFS='\t' -v winLen="$winLen" '{x2=$NF;x1=$(NF-1);$NF="";$(NF-1)="";
-	m=($2-$1)/(winLen);
-}
-print $0,x1 }' > $i"_cnvtv.cnv" ;
+	for (i in 1:length(c)) cat(c[i],d[i],'\n')" |R --slave -q | paste $output"_cnvtv_temp.cnv" - | awk -v nWin="$nWin" -v OFS='\t' -v winLen="$winLen" '{x2=$NF;x1=$(NF-1);$NF="";$(NF-1)="";
+	m=($2-$1)/(winLen); print $0,x1 }' > $output"_cnvtv.cnv" ;
 
 }
 
