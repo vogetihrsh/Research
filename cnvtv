@@ -1,5 +1,26 @@
 #!/bin/bash
 
+Calc_and_Print(){
+	avg=$1 && shift 
+		nWin=$1 && shift 
+		winLen=$1 && shift 
+		arr=($@)
+		echo "arr=as.integer(c(${arr[@]})); AVG=as.integer($avg); 
+		c=unlist(lapply(arr,function(x) ifelse(x<AVG,ppois(x,lambda=AVG),ppois(x,lambda=AVG,lower=FALSE) ) ));  
+	d=unlist(lapply(arr,function(x) dpois(x,lambda=AVG)));
+	for (i in 1:le) cat(c[i],d[i],'\n')" |R --slave -q | paste $i"_cnvtv_temp.cnv" - | awk -v nWin="$nWin" -v OFS='\t' -v winLen="$winLen" '{x2=$NF;x1=$(NF-1);$NF="";$(NF-1)="";
+	m=($2-$1)/(winLen);
+}
+print $0,x1 }' > $i"_cnvtv.cnv" ;
+
+}
+
+
+
+
+
+
+
 # PARAMETERS REQUIRED 
 window_length=100;
 no_of_procs=32;
@@ -8,6 +29,7 @@ output="aa";
 mappability_file="";
 window_file="win100.bed";
 SOURCEDIR=$(dirname $(readlink -f $0));
+
 # SCANNING FOR PARAMETERS
 while getopts 'w:p:i:o:m:z:' flag; do
 	case "${flag}" in 
@@ -25,8 +47,7 @@ done
 
 # DATA PREPARATION AND FILTERING 
 samtools view -@ 4 -q 1 -bh $input_file > $output"_temp1.bam";
-/usr/bin/bedtools-2.17.0/bin/bedtools bamtobed -i $output"_temp1.bam" > $output"_reads.bed";
-/usr/bin/bedtools-2.17.0/bin/bedtools coverage -a $output"_reads.bed" -b $window_file > $output"_temp1.bed";
+/usr/bin/bedtools-2.17.0/bin/bedtools coverage -abam $output"_temp1.bam" -b $window_file > $output"_temp1.bed";
 rm -rf $output"_reads.bed";
 
 sort -n -k2 $output"_temp1.bed" -o $output"_temp1.bed";
@@ -40,6 +61,7 @@ rm -rf $output"_temp1.bed" $output"_temp1.bam";
 # DIVIDE INTO CHUNKS 
 rm -rf $output"_inp"*
 y=$(wc -l $output"_cnvtv.input" | awk '{print $1}')
+N=y
 y=`expr $y / $no_of_procs`;
 split -l $y $output"_cnvtv.input" $output"_inp";
 p=`expr $no_of_procs - 1`
@@ -223,8 +245,7 @@ END{
 MAX_WIN=${myarray[${#myarray[@]}-1]};
 unset myarray[${#myarray[@]}-1];
 
-
-echo "c=c(${myarray[@]}); c=unlist(lapply(c,function(x) ifelse(x<4,ppois(x,lambda=4),ppois(x,lambda=4,lower=FALSE) ) )); cat(c,sep='\n')" | R --slave -q | paste $output"_cnvtv_temp.cnv" - | awk -v max_win="$MAX_WIN" -v OFS='\t'  '{p=$NF;$NF="";print $0,max_win/($2-$1),(p*max_win)/($2-$1)}' > $output"_cnvtv.cnv" ; 
+Calc_and_Print  $avg1 $N $window_length ${myarray[@]}
 
 rm -rf $output"_cnvtv_temp.cnv" $output"_cnvtv.call";
 
