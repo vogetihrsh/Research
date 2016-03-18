@@ -1,5 +1,71 @@
 #!/bin/bash
 
+shopt -s extglob
+
+# PARAMETERS  
+window_length=100;
+no_of_procs=32;
+
+input_file="";	# required
+mappability_file=""; # required
+window_file=""; # required
+config_file="" # optional 
+
+output="";      # required
+SOURCEDIR=$(dirname $(readlink -f $0));
+
+cflag=0
+
+# ERROR SET PARAMETERS AND ERROR DETECTION 
+
+# SCANNING FOR PARAMETERS
+while getopts 'w:p:i:o:m:z:c:' flag; do
+	case "${flag}" in 
+	w) window_length="${OPTARG}"  ;;
+	p) no_of_procs="${OPTARG}" ;;
+	i) input_file="${OPTARG}" ;;
+	o) output="${OPTARG}"  ;;
+	m) mappability_file="${OPTARG}" ;;
+	z) window_file="${OPTARG}" ;;
+	c) config_file="${OPTARG}" cflag=1;;
+	\?) echo "Invalid option: -$OPTARG" >& 2 exit ;;
+	esac 
+done
+
+# IF YOU USE -C CHECK IF CONFIG FILE EXISTS
+if [[ ! -f $config_file && $cflag -eq 1 ]]; then 
+	echo "Config File $config_file not found"
+	exit 
+
+elif [ $cflag -eq 1 ]; then 
+#PARSE INPUT FILE AND GET PARAMETERS
+	tr -d '\r' < $config_file > $output"config.temp"
+	while IFS='= ' read lhs rhs
+	do
+		if [[ ! $lhs =~ ^\ *'#' && -n $lhs ]]; then
+			rhs="${rhs%%\#*}"    # Del in line right comments
+			rhs="${rhs%%*( )}"   # Del trailing spaces
+			rhs="${rhs%\"*}"     # Del opening string quotes 
+			rhs="${rhs#\"*}"     # Del closing string quotes 
+			declare $lhs="$rhs"
+		fi
+	done < $output"config.temp"
+	rm -rf $output"config.temp"
+fi	
+
+# MINIMUM REQUIRED PARAMETERS
+if [[ -z "$input_file" || -z "$window_file" || -z "$mappability_file" || -z "$output" ]]; then
+	echo "Missing one of the required parameters: window_file (-z) mappability_file (-m) input_file (-i) output (-o) " >&2
+	exit 
+fi
+
+# FILE DOESNT EXIST ERROR
+if [[ ! -f $window_file || ! -f $input_file || ! -f $mappability_file ]]; then 
+	echo "One of the input files not found" >&2
+	exit
+fi
+#******************************************************************************#
+
 Calc_and_Print(){
 	avg=$1 && shift 
 		nWin=$1 && shift 
@@ -12,36 +78,7 @@ Calc_and_Print(){
 	m=($2-$1)/(winLen); print $0,x1 }' > $output"_cnvtv.cnv" ;
 
 }
-
-
-
-
-
-
-
-# PARAMETERS REQUIRED 
-window_length=100;
-no_of_procs=32;
-input_file="":
-output="aa";
-mappability_file="";
-window_file="win100.bed";
-SOURCEDIR=$(dirname $(readlink -f $0));
-
-# SCANNING FOR PARAMETERS
-while getopts 'w:p:i:o:m:z:' flag; do
-	case "${flag}" in 
-	w) window_length="${OPTARG}" ;;
-	p) no_of_procs="${OPTARG}" ;;
-	i) input_file="${OPTARG}" ;;
-	o) output="${OPTARG}" ;;
-	m) mappability_file="${OPTARG}" ;;
-	z) window_file="${OPTARG}" ;;
-	esac 
-done
-
-# ERROR CODE 
-
+#********************************************************************************#
 
 # DATA PREPARATION AND FILTERING 
 samtools view -@ 4 -q 1 -bh $input_file > $output"_temp1.bam";
@@ -54,7 +91,7 @@ mv $output"_temp2" $output"_temp1.bed";
 awk '{if($4!=0&&$5!=0&&$8>=0.5)print $4;}' $output"_temp1.bed" > $output"_cnvtv.input";
 awk '{if($4!=0&&$5!=0&&$8>=0.5)print $2,$3;}' $output"_temp1.bed" > $output"_cnvtv.bincor"; 
 rm -rf $output"_temp1.bed" $output"_temp1.bam";
-
+#******************************************************************************#
 
 # DIVIDE INTO CHUNKS 
 rm -rf $output"_inp"*
@@ -76,9 +113,9 @@ do
 		cat $FILE >> $output"_inp"$p
 		rm $output"_inp"$q
 	fi
-
+#***********************************************************************#
 # RUN THE SEGMENTATION ALGORITHM  USING MPIRUN
-	mpirun -np $no_of_procs $SOURCEDIR/segment $output;
+mpirun -np $no_of_procs $SOURCEDIR/segment $output;
 rm -rf $output"_inp"*;
 # MERGE THE ABOVE RESULTS
 for ((n=0;n<$no_of_procs;n++))
@@ -86,7 +123,7 @@ do
         cat $output"_out"$n >> $output"_cnvtv.output"
         rm -rf $output"_out"$n
 		done
-
+#***************************************************************************#
 # CODE TO MAKE CNV CALLS 
 		
 #rgument is the segmented binwise values with start and stop and the second argument is the ouput file ####
