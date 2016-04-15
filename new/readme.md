@@ -3,7 +3,6 @@
 ## Parameters 
 There are several paramters both optional and mandatory. The parameter values can be passed through command line as well as config file. 
 
-```
 | CLI FLAG | CONFIG FILE NAME | DESCRIPTION | OPTIONAL/REQUIRED|
 | --- | --- | --- | --- |
 | -i | input_file | Input file name | required |
@@ -15,5 +14,5 @@ There are several paramters both optional and mandatory. The parameter values ca
 | -u | upper_threshold | This paramater is used to the upper threshold. This factor is multiplied to the average RD value to obtain upper threshold. Default is 1.45 | optional |
 | -u | lower_threshold | This paramater is used to the lower threshold. This factor is multiplied to the average RD to obtain lower threshold. Default is 0.55. | optional |
 
-```
+
 
