@@ -96,7 +96,7 @@ rm -rf $output"_temp1.bed" $output"_temp1.bam";
 # DIVIDE INTO CHUNKS 
 rm -rf $output"_inp"*
 y=$(wc -l $output"_cnvtv.input" | awk '{print $1}')
-N=y
+N=$y
 y=`expr $y / $no_of_procs`;
 split -l $y $output"_cnvtv.input" $output"_inp";
 p=`expr $no_of_procs - 1`
@@ -131,7 +131,7 @@ do
 ##### bashscript first finds the average and then writes the output to the file  given as the second argument######
 
 paste $output"_cnvtv.bincor" $output"_cnvtv.output" > $output"_cnvtv.call";
-avg1=$(awk 'BEGIN{s=0}{s=s+$3}END{print s/NR}' $output"_cnvtv.call");
+avg1=$($SOURCEDIR"/calAvg" $N < $output"_cnvtv.output") ;
 ll=0.55;
 uu=1.45;
 bedcnv="_cnvtv_temp.cnv";
