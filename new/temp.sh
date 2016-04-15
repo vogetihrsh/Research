@@ -1,2 +1,0 @@
-output="x";
-rm  $output*;
