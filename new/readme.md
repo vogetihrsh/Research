@@ -2,9 +2,9 @@
 
 ## Requirements
 Make sure that these tools are added to your PATH variable 
-* samtools
-* bedtools
-* openMPI
+* samtools (Download [here] (https://sourceforge.net/projects/samtools/))
+* bedtools ([Install bedtools](http://bedtools.readthedocs.org/en/latest/content/installation.html))
+* openMPI  ([Installation Guide](http://lsi.ugr.es/~jmantas/pdp/ayuda/datos/instalaciones/Install_OpenMPI_en.pdf))
 
 ## Parameters 
 There are several paramters both optional and mandatory. The parameter values can be passed through command line as well as config file. 
