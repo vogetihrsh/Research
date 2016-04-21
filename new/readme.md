@@ -1,7 +1,8 @@
 # RD based CNV detection tool
 
 ## Requirements
-* Samtools
+Make sure that these tools are added to your PATH variable 
+* samtools
 * bedtools
 * openMPI
 
@@ -12,8 +13,9 @@ There are several paramters both optional and mandatory. The parameter values ca
 | --- | --- | --- | --- |
 | -i | input_file | Input file name | required |
 | -o | output | Output file prefix | required |
-| -z | window_file | A bed file containinginformation about windows chromosome name followed by start and stop. The length of each window should be the same for all entries. This length is taken as the bin/window_size | required |
+| -z | window_file | A bed file containing information about windows chromosome name followed by start and stop. The length of each window should be the same for all entries. This length is taken as the bin/window_size | required |
 | -m | mappability_file | Mappability values of the corresponding bins in the window file | required | 
+| -w | window_length | Window size that is to be used for detection. This value must be equal to the length of the windows in the bed file containing window information | required |
 | -c | NA | Configuration file that will be used for paramters. It is important to note that values from config file will overwrite those given through CLI. | optional |
 | -p | no_of_procs | Number of segmentation processes that are executed in paralell. The work load is evenly distributed among the processes. Its default value is 32, which is recommended. Segmentation takes time of O(n^2). | optional |
 | -u | upper_threshold | This paramater is used to the upper threshold. This factor is multiplied to the average RD value to obtain upper threshold. Default is 1.45 | optional |
