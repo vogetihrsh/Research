@@ -1,25 +1,40 @@
 #!/bin/bash
 
+#*********************************************************************#
+#       AUTHOR: SRIHARSHA VOGETI				      #
+#	EMAIL: vogetisri.harsha@research.iiit.ac.in                   #
+#   	SOURCE:                                                       #
+#   	DESCRIPTION: pCNVD PIPELINE SCRIPT                            #
+#   	LAST UPDATED: 18/06/16                                        #
+#*********************************************************************#
+
 shopt -s extglob
+#set -e 
+start_time=`date +%s`
 
-# PARAMETERS  
-window_length=100;
-no_of_procs=32;
 
-input_file="";	# required
-mappability_file=""; # required
-window_file=""; # required
-config_file="" # optional 
+#PARAMETERS WITH DEFAULT VALUES
+window_length=100;	# bin size
+no_of_procs=32;		# number of processes
+upper_threshold=1.45;	# upper threshold ratio
+lower_threshold=0.55;	# lower threshold ratio
+input_file="";		# INPUT FILE NAME && MANDATORY PARAMETER
+mappability_file=""; 	# MAPPABILITY FILE NAME && MANDATORY PARAMETER
+window_file=""; 	# BED FILE CONTAINING WINDOWS && required
+config_file="" 		# CONFIG FILE NAME && OPTIONAL
+output="";      	# OUTPUT PREFIX && MANDATORY PARAMETER
+SOURCEDIR=$(dirname $(readlink -f $0)); # SOURCE DIRECTORY 
+cflag=0			# FLAG FOR CHECKING IF CONFIG FILE IS GIVEN 
+segFlag=0		# SELECTING SEGMENTATION METHOD 0 FOR CNVTV && 1 FOR DNACOPY
+tempString=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1) # ALL NEW FILES CREATED WILL HAVE THIS RANDOM STRING 
 
-output="";      # required
-SOURCEDIR=$(dirname $(readlink -f $0));
-
-cflag=0
-
-# ERROR SET PARAMETERS AND ERROR DETECTION 
+#***************************************#
+#	READ OPTIONS FROM CMD 		#
+#	AND SET PARAMETERS		#
+#***************************************#
 
 # SCANNING FOR PARAMETERS
-while getopts 'w:p:i:o:m:z:c:' flag; do
+while getopts 'w:p:i:o:m:z:c:u:l:f:d' flag; do
 	case "${flag}" in 
 	w) window_length="${OPTARG}"  ;;
 	p) no_of_procs="${OPTARG}" ;;
@@ -28,6 +43,10 @@ while getopts 'w:p:i:o:m:z:c:' flag; do
 	m) mappability_file="${OPTARG}" ;;
 	z) window_file="${OPTARG}" ;;
 	c) config_file="${OPTARG}" cflag=1;;
+	u) upper_threshold="${OPTARG}" ;;
+	l) lower_threshold="${OPTARG}" ;;
+	f) merge_fraction="${OPTARG}" ;;
+	d) segFlag=1 ;;
 	\?) echo "Invalid option: -$OPTARG" >& 2 exit ;;
 	esac 
 done
@@ -64,9 +83,13 @@ if [[ ! -f $window_file || ! -f $input_file || ! -f $mappability_file ]]; then
 	echo "One of the input files not found" >&2
 	exit
 fi
-#******************************************************************************#
+#***************************************************************#  		#
+#	FUNCTION USED ARE DEFINED BELOW		   		#
+#	AVALIABLE FUNCTIONS: printStderr(), for p value       	#
+#	retChrom(), runDNACopy(), runTValgorithm() 		#
+#***************************************************************#
 
-Calc_and_Print(){
+function Calc_and_Print {
 	avg=$1 && shift 
 		nWin=$1 && shift 
 		winLen=$1 && shift 
@@ -74,70 +97,144 @@ Calc_and_Print(){
 		echo "arr=as.integer(c(${arr[@]})); AVG=as.integer($avg); 
 		c=unlist(lapply(arr,function(x) ifelse(x<AVG,ppois(x,lambda=AVG),ppois(x,lambda=AVG,lower=FALSE) ) ));  
 	d=unlist(lapply(arr,function(x) dpois(x,lambda=AVG)));
-	for (i in 1:length(c)) cat(c[i],d[i],'\n')" |R --slave -q | paste $output"_cnvtv_temp.cnv" - | awk -v nWin="$nWin" -v OFS='\t' -v winLen="$winLen" '{x2=$NF;x1=$(NF-1);$NF="";$(NF-1)="";
-	m=($2-$1)/(winLen); print $0,x1 }' > $output"_cnvtv.cnv" ;
+	for (i in 1:length(c)) cat(c[i],d[i],'\n')" |R --slave -q | paste $output"_pCNVD_temp.cnv" - | awk -v nWin="$nWin" -v OFS='\t' -v winLen="$winLen" '{x2=$NF;x1=$(NF-1);$NF="";$(NF-1)="";
+	m=($2-$1)/(winLen); print $0,x1 }' > $output"_pCNVD.bed" ;
 
 }
-#********************************************************************************#
 
-# DATA PREPARATION AND FILTERING 
-samtools view -@ 4 -q 1 -bh $input_file > $output"_temp1.bam";
-/usr/bin/bedtools-2.17.0/bin/bedtools coverage -abam $output"_temp1.bam" -b $window_file > $output"_temp1.bed";
-rm -rf $output"_reads.bed";
+# PRINTS ON STDERR
+function printStderr {
+	echo "$@" >&2;
+}
 
-sort -n -k2 $output"_temp1.bed" -o $output"_temp1.bed";
-paste $output"_temp1.bed" $mappability_file > $output"_temp2";
-mv $output"_temp2" $output"_temp1.bed";
-awk '{if($4!=0&&$5!=0&&$8>=0.5)print $4;}' $output"_temp1.bed" > $output"_cnvtv.input";
-awk '{if($4!=0&&$5!=0&&$8>=0.5)print $2,$3;}' $output"_temp1.bed" > $output"_cnvtv.bincor"; 
-rm -rf $output"_temp1.bed" $output"_temp1.bam";
-#******************************************************************************#
+# GET CHROMOSOME FUNCTION 
+function retChrom {
+	windowFile=$1
+	cName=$(head -1 $windowFile | awk '{print $1}')
+	echo $cName
+}
 
-# DIVIDE INTO CHUNKS 
-rm -rf $output"_inp"*
-y=$(wc -l $output"_cnvtv.input" | awk '{print $1}')
-N=$y
-y=`expr $y / $no_of_procs`;
-split -l $y $output"_cnvtv.input" $output"_inp";
-p=`expr $no_of_procs - 1`
-q=`expr $p + 1`
-k=0
-FILE=$output"_inp"$q;
-for i in $( ls $output"_inp"* )
-do
+#***********************************#
+#	CODE FOR DNA COPY	    #
+#***********************************#
+function runDNACopy {
+	# Run R script and generate segments 
+	Rscript $SOURCEDIR/RunDNACopy.R $output"_pCNVD.input" $numWindows > $tempString".Dtemp"
+	
+	# convert output into .input value
+	awk -v outputFile=$output"_pCNVD.output" ' NR>5 {
+		for(i=1; i<=$6; ++i){
+			   print $7 >> outputFile
+			}
+		}' $tempString".Dtemp"
+	rm -rf $tempString".Dtemp"
+}
+
+
+#*********************************#
+# CODE FOR RUNNING TV ALGORITHM   #
+# DIVIDE INPUT FILE INTO CHUNKS   #
+# RUN SEGMENTATION FOR EACH CHUNK #
+# MERGE BACK CHUNKS 		  # 
+#*********************************#
+function runTVAlgorithm {
+	
+	# calculate number of entries in each chunk 
+	rm -rf $output"_inp"*
+	y=$(wc -l $output"_pCNVD.input" | awk '{print $1}')
+	N=$y
+	y=`expr $y / $no_of_procs`;
+	split -l $y $output"_pCNVD.input" $output"_inp";
+	p=`expr $no_of_procs - 1`
+	q=`expr $p + 1`
+	k=0
+	FILE=$output"_inp"$q;
+		
+	# change splits name
+	for i in $( ls $output"_inp"* )
+	do
 	mv -f $i $output"_inp"$k
-((k++))
+	((k++))
 	done
+	
+	# check for the last remaining input values
 	if [ -f $FILE ];
 	then
 		cat $FILE >> $output"_inp"$p
 		rm $output"_inp"$q
 	fi
-#***********************************************************************#
-# RUN THE SEGMENTATION ALGORITHM  USING MPIRUN
-mpirun -np $no_of_procs $SOURCEDIR/segment $output;
-rm -rf $output"_inp"*;
-# MERGE THE ABOVE RESULTS
-for ((n=0;n<$no_of_procs;n++))
-do
-        cat $output"_out"$n >> $output"_cnvtv.output"
-        rm -rf $output"_out"$n
-		done
-#***************************************************************************#
-# CODE TO MAKE CNV CALLS 
-		
-#rgument is the segmented binwise values with start and stop and the second argument is the ouput file ####
-### input is a file containing start stop positions and the binwise corrected values ######
-##### bashscript first finds the average and then writes the output to the file  given as the second argument######
+	
+	# calculate average value by calling external cpp script
+	avg1=$( $SOURCEDIR"/calAvg" $N < $output"_pCNVD.input" | awk '{print $1}' );
 
-paste $output"_cnvtv.bincor" $output"_cnvtv.output" > $output"_cnvtv.call";
-avg1=$($SOURCEDIR"/calAvg" $N < $output"_cnvtv.output") ;
-ll=0.55;
-uu=1.45;
-bedcnv="_cnvtv_temp.cnv";
+	# comes into play when creating overlapping input files, otherwise has no affect. But needded
+	stop1=`expr $no_of_procs - 1`
+	for((i=0; i<stop1; i++ )); do
+		j=`expr $i + 1`
+		#tail -20 $output"_inp"$i > $output$tempString
+		cat $output"_inp"$j > $output$tempString
+		mv $output$tempString $output"_inp"$j
+	done
+
+	# run segmentation algorith using segment 
+	mpirun -np $no_of_procs $SOURCEDIR/segment $output;
+	rm -rf $output"_inp"*;
+	rm -rf $output"_pCNVD.output"
+			
+	# merge segmented chunk files 
+	for ((n=0;n<$no_of_procs;n++))
+	do
+		cat $output"_out"$n >> $output"_pCNVD.output"
+		rm -rf $output"_out"$n
+	done
+
+}
+
+chrName=$(retChrom $window_file) # chromosome name 
+
+
+#***********************************************#
+#	MAIN FUNCTION STARTS HERE		#
+#	PRECPROCESS-SEGMENTATION-POSTPROCESS	#
+#***********************************************#
+
+# DATA PREPARATION AND FILTERING 
+samtools view -@ 4 -q 1 -bh $input_file > $output"_temp1.bam";
+bedtools coverage -abam $output"_temp1.bam" -b $window_file > $output"_temp1.bed";
+rm -rf $output"_reads.bed";
+
+sort -n -k2 $output"_temp1.bed" -o $output"_temp1.bed";
+paste $output"_temp1.bed" $mappability_file > $output"_temp2";
+mv $output"_temp2" $output"_temp1.bed";
+awk '{if($4!=0&&$5!=0&&$8>=0.5)print $4;}' $output"_temp1.bed" > $output"_pCNVD.input";
+awk '{if($4!=0&&$5!=0&&$8>=0.5)print $2,$3;}' $output"_temp1.bed" > $output"_pCNVD.bincor"; 
+rm -rf $output"_temp1.bed" $output"_temp1.bam";
+printStderr "Read Depth file generation...DONE"
+
+numWindows=$(wc -l $output"_pCNVD.input" | awk '{print $1}')
+avg1=$($SOURCEDIR"/calAvg" $numWindows < $output"_pCNVD.input" | awk '{print $1}');
+
+##############################################################################################
+
+
+### CALL SEGMENTATION ALGORITHMS #######
+if [[ segFlag -eq 0 ]]; then 
+	runTVAlgorithm ;
+else 
+	runDNACopy;
+fi	
+printStderr "Started Making CNV calls"
+
+#################################################################################################
+
+##### POST PROCESSING #####
+paste $output"_pCNVD.bincor" $output"_pCNVD.output" > $output"_pCNVD.call";
+ll=$lower_threshold;
+uu=$upper_threshold;
+bedcnv="_pCNVD.bed";
 lower_cutoff=$(echo $ll $avg1 | awk '{print $1*$2}' )
 upper_cutoff=$(echo $uu $avg1 | awk '{print $1*$2}' )
-myarray=($(awk -v lc="$lower_cutoff" -v hc="$upper_cutoff" -v outfile="$output$bedcnv" -v avg="$avg1" '
+awk -v lc="$lower_cutoff" -v hc="$upper_cutoff" -v outfile="$output$bedcnv" -v avg="$avg1" -v chrName="$chrName" '
 
 # temp function delete after done
 function isCopyNumberZero(cAvg,cCount)
@@ -200,6 +297,7 @@ BEGIN {
 		entryPointer=-1;
 		epoint=prevEndPoint;
 		curAvg=curAvg/count;
+
 		cn=(curAvg*2)/avg;
 		if(count>1){
 			PTR=PTR+1;
@@ -252,8 +350,7 @@ END{
 			i++;
 		}
 		else{
-			printf ("%d\t%d\t%d\t%.2f\n",CSTART,CSTOP,CEVENT,CCOPY) >> outfile;
-			print (CCOPY*avg)/2,",";
+			printf ("%s\t%d\t%d\t%d\t%.2f\n",chrName,CSTART,CSTOP,CEVENT,CCOPY) >> outfile;
 			FLAG=0;
 			
 			# CALCULATE MAXIMUM WINDOW LENGTH
@@ -265,22 +362,20 @@ END{
 
 	#PRINT THE LEFTOVER CNV, IF ANY
 	if(FLAG){
-			printf ("%d\t%d\t%d\t%.2f\n",CSTART,CSTOP,CEVENT,CCOPY) >> outfile;
-			print (CCOPY*avg)/2;
+			printf ("%s\t%d\t%d\t%d\t%.2f\n",chrName,CSTART,CSTOP,CEVENT,CCOPY) >> outfile;
 			
 			# CALCULATE MAXIMUM WINDOW LENGTH
 			temp=CSTOP-CSTART;
 			if(MAX_WIN<temp)
 				MAX_WIN=temp;
-			printf("%d",MAX_WIN);	
+		#	printf("%d",MAX_WIN);	
 	}
 }
-'   $output"_cnvtv.call" ;))
+'   $output"_pCNVD.call"
 
-MAX_WIN=${myarray[${#myarray[@]}-1]};
-unset myarray[${#myarray[@]}-1];
 
-Calc_and_Print  $avg1 $N $window_length ${myarray[@]}
+rm -rf $output"_pCNVD.call"
 
-rm -rf $output"_cnvtv_temp.cnv" $output"_cnvtv.call";
-
+printStderr "COMPLETED...!"
+end_time=`date +%s`
+echo "Time taken: "$((end_time-start_time))"s"
